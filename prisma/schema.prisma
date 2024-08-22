@@ -1,0 +1,289 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               Int      @id @default(autoincrement())
+  email            String   @unique
+  name             String
+  password         String
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  availability     Boolean  @default(true)
+  role             String   @default("supervisor")
+  shiftId          Int?     @map("shift_id")
+  closedAlerts     Alert[]  @relation("ClosedBy")
+  Device           Device[]
+  Shift            Shift?   @relation(fields: [shiftId], references: [id])
+  authorizedAlerts Alert[]  @relation("AuthorizedUsers")
+
+  @@map("users")
+}
+
+model Shift {
+  id        Int    @id @default(autoincrement())
+  name      String @db.VarChar(255)
+  startTime String @map("start_time") @db.VarChar(8)
+  endTime   String @map("end_time") @db.VarChar(8)
+  users     User[]
+
+  @@map("shifts")
+}
+
+model Rule {
+  id           Int         @id @default(autoincrement())
+  name         String      @unique @db.VarChar(255)
+  roomId       Int         @map("room_id")
+  panelId      Int         @map("panel_id")
+  deviceId     Int         @map("device_id")
+  deviceTypeId Int         @map("device_type_id")
+  Alert        Alert[]
+  device       Device      @relation(fields: [deviceId], references: [id])
+  deviceType   DeviceType  @relation(fields: [deviceTypeId], references: [id])
+  panel        Panel       @relation(fields: [panelId], references: [id])
+  room         Room        @relation(fields: [roomId], references: [id])
+  RuleRange    RuleRange[]
+
+  @@map("rules")
+}
+
+model RuleRange {
+  id            Int    @id @default(autoincrement())
+  parameterName String @map("parameter_name") @db.VarChar(255)
+  minValue      Float  @map("min_value")
+  maxValue      Float  @map("max_value")
+  ruleId        Int    @map("rule_id")
+  Rule          Rule   @relation(fields: [ruleId], references: [id])
+
+  @@map("rule_ranges")
+}
+
+model Alert {
+  id             Int      @id @default(autoincrement())
+  ruleId         Int      @map("rule_id")
+  closedById     Int?     @map("closed_by_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  currentReading Float    @map("current_reading")
+  closedBy       User?    @relation("ClosedBy", fields: [closedById], references: [id])
+  Rule           Rule     @relation(fields: [ruleId], references: [id])
+  authorizedUser User[]   @relation("AuthorizedUsers")
+
+  @@map("alerts")
+}
+
+model Area {
+  id   Int    @id @default(autoincrement())
+  name String @unique
+  Room Room[]
+
+  @@map("areas")
+}
+
+model Room {
+  id     Int      @id @default(autoincrement())
+  name   String   @unique
+  areaId Int      @map("area_id")
+  panels Panel[]
+  Report Report[]
+  area   Area     @relation(fields: [areaId], references: [id])
+  Rule   Rule[]
+  Screen Screen[]
+
+  @@map("rooms")
+}
+
+model Panel {
+  id     Int      @id @default(autoincrement())
+  name   String   @unique
+  roomId Int      @map("room_id")
+  Device Device[]
+  room   Room     @relation(fields: [roomId], references: [id])
+  Rule   Rule[]
+  Screen Screen[]
+
+  @@map("panels")
+}
+
+model DeviceType {
+  id     Int      @id @default(autoincrement())
+  name   String   @unique
+  Device Device[]
+  Rule   Rule[]
+
+  @@map("device_types")
+}
+
+model Device {
+  id                 Int                  @id @default(autoincrement())
+  name               String               @unique
+  userId             Int                  @map("user_id")
+  deviceTypeId       Int                  @map("device_type_id")
+  panelId            Int                  @map("panel_id")
+  CompressorReading  CompressorReading[]
+  deviceType         DeviceType           @relation(fields: [deviceTypeId], references: [id])
+  panel              Panel                @relation(fields: [panelId], references: [id])
+  user               User                 @relation(fields: [userId], references: [id])
+  EnergyMeterReading EnergyMeterReading[]
+  FlowMeterReading   FlowMeterReading[]
+  HumidityReading    HumidityReading[]
+  PumpStatusReading  PumpStatusReading[]
+  Report             Report[]
+  Rule               Rule[]
+  Screen             Screen[]
+  TemperatureReading TemperatureReading[]
+  WaterLevelReading  WaterLevelReading[]
+
+  @@map("devices")
+}
+
+model Configuration {
+  id                    Int                  @id @default(autoincrement())
+  color                 String
+  minValue              Float
+  maxValue              Float
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  deviceConfigurationId Int?
+  DeviceConfiguration   DeviceConfiguration? @relation("DeviceConfigurations", fields: [deviceConfigurationId], references: [id])
+
+  @@map("configurations")
+}
+
+model DeviceConfiguration {
+  id             Int             @id @default(autoincrement())
+  configType     String
+  deviceId       Int
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  configurations Configuration[] @relation("DeviceConfigurations")
+
+  @@map("device_configurations")
+}
+
+model Screen {
+  id             Int    @id @default(autoincrement())
+  roomId         Int    @map("room_id")
+  panelId        Int    @map("panel_id")
+  deviceId       Int    @map("device_id")
+  screenDuration Int    @map("screen_duration")
+  device         Device @relation(fields: [deviceId], references: [id])
+  panel          Panel  @relation(fields: [panelId], references: [id])
+  room           Room   @relation(fields: [roomId], references: [id])
+
+  @@map("screens")
+}
+
+model EnergyMeterReading {
+  id                     Int      @id @default(autoincrement())
+  deviceId               Int      @map("device_id")
+  voltageR               Float    @map("voltage_r")
+  voltageY               Float    @map("voltage_y")
+  voltageB               Float    @map("voltage_b")
+  currentR               Float    @map("current_r")
+  currentY               Float    @map("current_y")
+  currentB               Float    @map("current_b")
+  powerFactor            Float    @map("power_factor")
+  frequency              Float
+  power                  Float
+  powerConsumption       Float    @map("power_consumption")
+  kiloVoltAmpere         Float    @map("kilo_volt_ampere")
+  kiloVoltAmpereReactive Float    @map("kilo_volt_ampere_reactive")
+  kiloVoltAmpereHour     Float    @map("kilo_volt_ampere_hour")
+  status                 Int
+  createdAt              DateTime @default(now()) @map("created_at")
+  device                 Device   @relation(fields: [deviceId], references: [id])
+
+  @@map("energy_meter_readings")
+}
+
+model FlowMeterReading {
+  id               Int      @id @default(autoincrement())
+  deviceId         Int      @map("device_id")
+  current_flow     Float
+  cummulative_flow Float
+  status           Boolean
+  createdAt        DateTime @default(now()) @map("created_at")
+  device           Device   @relation(fields: [deviceId], references: [id])
+
+  @@map("flow_meter_readings")
+}
+
+model TemperatureReading {
+  id          Int      @id @default(autoincrement())
+  deviceId    Int      @map("device_id")
+  temperature Float
+  status      Boolean
+  createdAt   DateTime @default(now()) @map("created_at")
+  device      Device   @relation(fields: [deviceId], references: [id])
+
+  @@map("temperature_readings")
+}
+
+model HumidityReading {
+  id        Int      @id @default(autoincrement())
+  deviceId  Int      @map("device_id")
+  humidity  Float
+  status    Boolean
+  createdAt DateTime @default(now()) @map("created_at")
+  device    Device   @relation(fields: [deviceId], references: [id])
+
+  @@map("humidity_readings")
+}
+
+model CompressorReading {
+  id                   Int      @id @default(autoincrement())
+  deviceId             Int      @map("device_id")
+  dischargePressure    Float    @map("discharge_pressure")
+  oilPressure          Float    @map("oil_pressure")
+  dischargeTemperature Float    @map("discharge_temperature")
+  oilTemp              Float    @map("oil_temp")
+  current              Float
+  totalRunningHours    Float    @map("total_running_hours")
+  machineStatus        Int      @map("machine_status")
+  caution              Int
+  load                 Float
+  createdAt            DateTime @default(now()) @map("created_at")
+  device               Device   @relation(fields: [deviceId], references: [id])
+
+  @@map("compressor_readings")
+}
+
+model PumpStatusReading {
+  id        Int      @id @default(autoincrement())
+  deviceId  Int      @map("device_id")
+  status    Int
+  createdAt DateTime @default(now()) @map("created_at")
+  device    Device   @relation(fields: [deviceId], references: [id])
+
+  @@map("pump_status_readings")
+}
+
+model WaterLevelReading {
+  id        Int      @id @default(autoincrement())
+  deviceId  Int      @map("device_id")
+  status    Int
+  createdAt DateTime @default(now()) @map("created_at")
+  device    Device   @relation(fields: [deviceId], references: [id])
+
+  @@map("water_level_readings")
+}
+
+model Report {
+  id       Int      @id @default(autoincrement())
+  roomId   Int      @map("room_id")
+  deviceId Int      @map("device_id")
+  userIds  String[] @map("user_ids")
+  duration Int
+  sendAt   String   @default("08:00 am") @map("send_at")
+  date     String   @default("2024-01-01")
+  device   Device   @relation(fields: [deviceId], references: [id])
+  room     Room     @relation(fields: [roomId], references: [id])
+
+  @@map("reports")
+}
